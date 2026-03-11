@@ -1,8 +1,8 @@
 {
     "agents": [
-        "junie",
-        "cursor",
         "claude_code",
+        "cursor",
+        "copilot",
         "opencode"
     ],
     "guidelines": true,
@@ -12,6 +12,7 @@
     "skills": [
         "fluxui-development",
         "livewire-development",
-        "pest-testing"
+        "pest-testing",
+        "tailwindcss-development"
     ]
 }
