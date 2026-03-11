@@ -1,84 +1,68 @@
 <?php
 
-namespace Tests\Feature\Settings;
-
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Features;
 use Livewire\Livewire;
-use Tests\TestCase;
 
-class TwoFactorAuthenticationTest extends TestCase
-{
-    use RefreshDatabase;
+beforeEach(function () {
+    $this->skipUnlessFortifyFeature(Features::twoFactorAuthentication());
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+    Features::twoFactorAuthentication([
+        'confirm' => true,
+        'confirmPassword' => true,
+    ]);
+});
 
-        $this->skipUnlessFortifyFeature(Features::twoFactorAuthentication());
+test('two factor settings page can be rendered', function () {
+    $user = User::factory()->create();
 
-        Features::twoFactorAuthentication([
-            'confirm' => true,
-            'confirmPassword' => true,
-        ]);
-    }
+    $this->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->get(route('two-factor.show'))
+        ->assertOk()
+        ->assertSee('Two-factor authentication')
+        ->assertSee('Disabled');
+});
 
-    public function test_two_factor_settings_page_can_be_rendered(): void
-    {
-        $user = User::factory()->create();
+test('two factor settings page requires password confirmation when enabled', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->withSession(['auth.password_confirmed_at' => time()])
-            ->get(route('two-factor.show'))
-            ->assertOk()
-            ->assertSee('Two-factor authentication')
-            ->assertSee('Disabled');
-    }
+    $response = $this->actingAs($user)
+        ->get(route('two-factor.show'));
 
-    public function test_two_factor_settings_page_requires_password_confirmation_when_enabled(): void
-    {
-        $user = User::factory()->create();
+    $response->assertRedirect(route('password.confirm'));
+});
 
-        $response = $this->actingAs($user)
-            ->get(route('two-factor.show'));
+test('two factor settings page returns forbidden response when two factor is disabled', function () {
+    config(['fortify.features' => []]);
 
-        $response->assertRedirect(route('password.confirm'));
-    }
+    $user = User::factory()->create();
 
-    public function test_two_factor_settings_page_returns_forbidden_response_when_two_factor_is_disabled(): void
-    {
-        config(['fortify.features' => []]);
+    $response = $this->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->get(route('two-factor.show'));
 
-        $user = User::factory()->create();
+    $response->assertForbidden();
+});
 
-        $response = $this->actingAs($user)
-            ->withSession(['auth.password_confirmed_at' => time()])
-            ->get(route('two-factor.show'));
+test('two factor authentication disabled when confirmation abandoned between requests', function () {
+    $user = User::factory()->create();
 
-        $response->assertForbidden();
-    }
+    $user->forceFill([
+        'two_factor_secret' => encrypt('test-secret'),
+        'two_factor_recovery_codes' => encrypt(json_encode(['code1', 'code2'])),
+        'two_factor_confirmed_at' => null,
+    ])->save();
 
-    public function test_two_factor_authentication_disabled_when_confirmation_abandoned_between_requests(): void
-    {
-        $user = User::factory()->create();
+    $this->actingAs($user);
 
-        $user->forceFill([
-            'two_factor_secret' => encrypt('test-secret'),
-            'two_factor_recovery_codes' => encrypt(json_encode(['code1', 'code2'])),
-            'two_factor_confirmed_at' => null,
-        ])->save();
+    $component = Livewire::test('settings.two-factor');
 
-        $this->actingAs($user);
+    $component->assertSet('twoFactorEnabled', false);
 
-        $component = Livewire::test('settings.two-factor');
-
-        $component->assertSet('twoFactorEnabled', false);
-
-        $this->assertDatabaseHas('users', [
-            'id' => $user->id,
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-        ]);
-    }
-}
+    $this->assertDatabaseHas('users', [
+        'id' => $user->id,
+        'two_factor_secret' => null,
+        'two_factor_recovery_codes' => null,
+    ]);
+});
