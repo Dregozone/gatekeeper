@@ -27,7 +27,7 @@
     {{-- Messages --}}
     <div
         x-ref="messages"
-        class="flex-1 space-y-3 overflow-y-auto p-4"
+        class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
     >
         @forelse ($messages as $index => $message)
             @if ($message['role'] === 'user')

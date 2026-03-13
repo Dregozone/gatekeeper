@@ -1,4 +1,4 @@
-<div class="flex h-full w-full flex-col">
+<div class="flex h-[calc(100dvh-6.5rem)] w-full flex-col overflow-hidden lg:h-[calc(100dvh-4rem)]">
     @if (count($this->agents) > 0)
         <div class="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
             @foreach ($this->agents as $agentClass)
