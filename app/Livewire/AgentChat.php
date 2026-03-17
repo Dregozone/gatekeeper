@@ -2,7 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Contracts\GeneratesImages;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -21,10 +24,14 @@ class AgentChat extends Component
     #[Locked]
     public ?string $conversationId = null;
 
+    /** @var bool Whether this agent generates images instead of text. */
+    #[Locked]
+    public bool $isImageAgent = false;
+
     /**
      * The conversation message history for display.
      *
-     * @var array<int, array{role: string, content: string}>
+     * @var array<int, array{role: string, content: string, type?: string}>
      */
     #[Locked]
     public array $messages = [];
@@ -51,6 +58,7 @@ class AgentChat extends Component
     {
         $this->agentClass = $agentClass;
         $this->agentName = str($agentClass)->classBasename()->before('Agent')->toString();
+        $this->isImageAgent = is_subclass_of($agentClass, GeneratesImages::class);
 
         $user = auth()->user();
 
@@ -65,8 +73,17 @@ class AgentChat extends Component
             $this->messages = DB::table('agent_conversation_messages')
                 ->where('conversation_id', $this->conversationId)
                 ->orderBy('created_at')
-                ->get(['role', 'content'])
-                ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
+                ->get(['role', 'content', 'meta'])
+                ->map(function ($m) {
+                    $meta = json_decode($m->meta, true) ?: [];
+                    $message = ['role' => $m->role, 'content' => $m->content];
+
+                    if (isset($meta['type'])) {
+                        $message['type'] = $meta['type'];
+                    }
+
+                    return $message;
+                })
                 ->toArray();
         }
     }
@@ -103,6 +120,12 @@ class AgentChat extends Component
             return;
         }
 
+        if ($this->isImageAgent) {
+            $this->generateImage();
+
+            return;
+        }
+
         $user = auth()->user();
         $pendingMessage = $this->pendingMessage;
 
@@ -133,5 +156,131 @@ class AgentChat extends Component
         $this->currentResponse = '';
         $this->isStreaming = false;
         $this->pendingMessage = '';
+    }
+
+    /**
+     * Generate an image using the agent, store it, and persist the conversation.
+     */
+    protected function generateImage(): void
+    {
+        $agent = new $this->agentClass;
+
+        $imageData = $agent->generateImage($this->pendingMessage);
+
+        $imageUrl = $this->storeGeneratedImage($imageData);
+
+        $this->persistImageConversation($this->pendingMessage, $imageUrl);
+
+        $this->messages[] = [
+            'role' => 'assistant',
+            'content' => $imageUrl,
+            'type' => 'image',
+        ];
+
+        $this->isStreaming = false;
+        $this->pendingMessage = '';
+    }
+
+    /**
+     * Store an image to the public disk and return its URL.
+     *
+     * Handles base64 data URIs, raw base64 strings, and remote URLs.
+     * Falls back to treating the data as a direct URL if no other format matches.
+     */
+    protected function storeGeneratedImage(string $imageData): string
+    {
+        // Base64 data URI: data:image/png;base64,...
+        if (preg_match('/^data:image\/(\w+);base64,(.+)$/s', $imageData, $matches)) {
+            $extension = $matches[1] === 'jpeg' ? 'jpg' : $matches[1];
+
+            return $this->storeImageToDisk(
+                base64_decode($matches[2]),
+                $extension,
+            );
+        }
+
+        // Remote URL: download and store locally so it persists
+        if (filter_var($imageData, FILTER_VALIDATE_URL)) {
+            return $imageData;
+        }
+
+        // Raw base64 without data URI prefix
+        $decoded = base64_decode($imageData, true);
+
+        if ($decoded !== false && strlen($decoded) > 100) {
+            return $this->storeImageToDisk($decoded, 'png');
+        }
+
+        return $imageData;
+    }
+
+    /**
+     * Write raw image bytes to the public disk and return the URL.
+     */
+    protected function storeImageToDisk(string $bytes, string $extension): string
+    {
+        $filename = 'generated-images/'.Str::random(40).'.'.$extension;
+
+        Storage::disk('public')->put($filename, $bytes);
+
+        return Storage::disk('public')->url($filename);
+    }
+
+    /**
+     * Manually persist the image conversation to the database.
+     *
+     * The RemembersConversations middleware only works with the text streaming
+     * pipeline, so image conversations are stored directly.
+     */
+    protected function persistImageConversation(string $prompt, string $imageUrl): void
+    {
+        $userId = auth()->id();
+        $now = now();
+
+        if (! $this->conversationId) {
+            $this->conversationId = (string) Str::uuid();
+
+            DB::table('agent_conversations')->insert([
+                'id' => $this->conversationId,
+                'user_id' => $userId,
+                'title' => Str::limit($prompt, 100),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } else {
+            DB::table('agent_conversations')
+                ->where('id', $this->conversationId)
+                ->update(['updated_at' => $now]);
+        }
+
+        $baseMessage = [
+            'conversation_id' => $this->conversationId,
+            'user_id' => $userId,
+            'agent' => $this->agentClass,
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '{}',
+        ];
+
+        DB::table('agent_conversation_messages')->insert([
+            ...$baseMessage,
+            'id' => (string) Str::uuid(),
+            'role' => 'user',
+            'content' => $prompt,
+            'meta' => '{}',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('agent_conversation_messages')->insert([
+            ...$baseMessage,
+            'id' => (string) Str::uuid(),
+            'role' => 'assistant',
+            'content' => $imageUrl,
+            'meta' => json_encode(['type' => 'image']),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 }
