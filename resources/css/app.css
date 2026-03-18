@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '../../vendor/livewire/flux/dist/flux.css';
+@plugin "@tailwindcss/typography";
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -52,7 +53,7 @@
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight;
 }
 
 input:focus[data-flux-control],
@@ -62,8 +63,15 @@ select:focus[data-flux-control] {
 }
 
 @keyframes toolbar-slide-in {
-    0% { opacity: 0; transform: translateY(1.5rem) scale(0.96); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+    0% {
+        opacity: 0;
+        transform: translateY(1.5rem) scale(0.96);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .toolbar-enter {

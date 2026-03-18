@@ -49,8 +49,10 @@
                 </div>
             @else
                 <div class="flex justify-start" wire:key="msg-{{ $index }}">
-                    <div class="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-tl-sm bg-zinc-100 px-4 py-2.5 text-sm text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
-                        {{ $message['content'] }}
+                    <div class="max-w-[80%] rounded-2xl rounded-tl-sm bg-zinc-100 px-4 py-2.5 dark:bg-zinc-800">
+                        <div class="prose prose-sm prose-zinc dark:prose-invert max-w-none">
+                            {!! Str::markdown($message['content'], ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
+                        </div>
                     </div>
                 </div>
             @endif
