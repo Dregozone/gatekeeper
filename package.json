@@ -11,10 +11,10 @@
         "@tailwindcss/vite": "^4.1.11",
         "autoprefixer": "^10.4.20",
         "axios": "^1.7.4",
-        "concurrently": "^9.0.1",
+        "concurrently": "^10.0.6",
         "dompurify": "^3.3.3",
         "laravel-vite-plugin": "^2.0",
-        "marked": "^17.0.4",
+        "marked": "^18.1.1",
         "tailwindcss": "^4.0.7",
         "vite": "^7.0.4"
     },
