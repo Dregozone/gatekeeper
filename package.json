@@ -13,13 +13,13 @@
         "axios": "^1.7.4",
         "concurrently": "^10.0.6",
         "dompurify": "^3.3.3",
-        "laravel-vite-plugin": "^2.0",
+        "laravel-vite-plugin": "^3.2.0",
         "marked": "^18.1.1",
         "tailwindcss": "^4.0.7",
-        "vite": "^7.0.4"
+        "vite": "^8.3.5"
     },
     "optionalDependencies": {
-        "@rollup/rollup-linux-x64-gnu": "4.9.5",
+        "@rollup/rollup-linux-x64-gnu": "^4.65.0",
         "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
         "lightningcss-linux-x64-gnu": "^1.29.1"
     },
