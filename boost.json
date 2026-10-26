@@ -5,14 +5,20 @@
         "copilot",
         "opencode"
     ],
+    "cloud": true,
     "guidelines": true,
     "herd_mcp": false,
     "mcp": true,
     "sail": false,
     "skills": [
+        "infer-conventions",
+        "deploying-to-cloud",
+        "ai-sdk-development",
+        "fortify-development",
+        "laravel-best-practices",
+        "testing-best-practices",
         "fluxui-development",
         "livewire-development",
-        "pest-testing",
         "tailwindcss-development"
     ]
 }

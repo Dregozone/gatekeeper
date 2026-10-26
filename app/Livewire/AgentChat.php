@@ -6,6 +6,7 @@ use App\Contracts\GeneratesImages;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Laravel\Ai\Enums\MessageStatus;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -64,7 +65,8 @@ class AgentChat extends Component
 
         $this->conversationId = DB::table('agent_conversations as ac')
             ->join('agent_conversation_messages as acm', 'ac.id', '=', 'acm.conversation_id')
-            ->where('ac.user_id', $user->id)
+            ->where('ac.participant_type', $user->getMorphClass())
+            ->where('ac.participant_id', $user->getKey())
             ->where('acm.agent', $agentClass)
             ->orderByDesc('ac.updated_at')
             ->value('ac.id');
@@ -72,6 +74,7 @@ class AgentChat extends Component
         if ($this->conversationId) {
             $this->messages = DB::table('agent_conversation_messages')
                 ->where('conversation_id', $this->conversationId)
+                ->where('status', '!=', MessageStatus::Failed->value)
                 ->orderBy('created_at')
                 ->get(['role', 'content', 'meta'])
                 ->map(function ($m) {
@@ -234,7 +237,7 @@ class AgentChat extends Component
      */
     protected function persistImageConversation(string $prompt, string $imageUrl): void
     {
-        $userId = auth()->id();
+        $user = auth()->user();
         $now = now();
 
         if (! $this->conversationId) {
@@ -242,7 +245,8 @@ class AgentChat extends Component
 
             DB::table('agent_conversations')->insert([
                 'id' => $this->conversationId,
-                'user_id' => $userId,
+                'participant_type' => $user->getMorphClass(),
+                'participant_id' => $user->getKey(),
                 'title' => Str::limit($prompt, 100),
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -255,12 +259,12 @@ class AgentChat extends Component
 
         $baseMessage = [
             'conversation_id' => $this->conversationId,
-            'user_id' => $userId,
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => $user->getKey(),
             'agent' => $this->agentClass,
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
             'usage' => '{}',
+            'status' => MessageStatus::Completed->value,
         ];
 
         DB::table('agent_conversation_messages')->insert([
@@ -268,6 +272,7 @@ class AgentChat extends Component
             'id' => (string) Str::uuid(),
             'role' => 'user',
             'content' => $prompt,
+            'steps' => '[]',
             'meta' => '{}',
             'created_at' => $now,
             'updated_at' => $now,
@@ -278,6 +283,13 @@ class AgentChat extends Component
             'id' => (string) Str::uuid(),
             'role' => 'assistant',
             'content' => $imageUrl,
+            'steps' => json_encode([[
+                'content' => $imageUrl,
+                'tool_calls' => [],
+                'reasoning' => '',
+                'replay_blocks' => [],
+                'provider_tool_calls' => [],
+            ]]),
             'meta' => json_encode(['type' => 'image']),
             'created_at' => $now,
             'updated_at' => $now,

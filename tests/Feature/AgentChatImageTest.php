@@ -73,7 +73,8 @@ test('image agent generates image from url response and persists conversation', 
 
     $this->assertDatabaseHas('agent_conversations', [
         'id' => $conversationId,
-        'user_id' => $user->id,
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => $user->id,
     ]);
 
     $this->assertDatabaseHas('agent_conversation_messages', [
