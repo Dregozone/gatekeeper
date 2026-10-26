@@ -48,9 +48,9 @@ class AgentController extends Controller
             'message' => $response->text,
             'conversation_id' => $response->conversationId,
             'usage' => [
-                'prompt_tokens' => $response->usage->promptTokens,
-                'completion_tokens' => $response->usage->completionTokens,
-                'total_tokens' => $response->usage->promptTokens + $response->usage->completionTokens,
+                'prompt_tokens' => $response->usage->inputTokens,
+                'completion_tokens' => $response->usage->outputTokens,
+                'total_tokens' => $response->usage->inputTokens + $response->usage->outputTokens,
             ],
         ]);
     }
